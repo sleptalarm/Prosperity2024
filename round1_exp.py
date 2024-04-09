@@ -112,9 +112,10 @@ class Trader:
 
     position = {'AMETHYSTS' : 0, 'STARFRUIT' : 0}
     pos_limit = {'AMETHYSTS' : 20, 'STARFRUIT' : 20}
-    # discount = 0.02
-    discount = 0.98
-    discount_inventory = 16
+    discount_buy = 0.98
+    discount_sell = 0.98
+    discount_inventory_buy = 16
+    discount_inventory_sell = 10
 
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
 
@@ -147,8 +148,8 @@ class Trader:
                             if self.position[product] == 20:
                                 logger.print(f"Can't buy {product}")
                             # orders[product].append(Order(product, price, -amount))
-                            adjust = max(self.position[product]/ self.discount_inventory,0) 
-                            amount_new = round(amount * np.power(self.discount,max(price - best_price_buy + adjust, 0)))
+                            adjust = max(self.position[product]/ self.discount_inventory_buy,0) 
+                            amount_new = round(amount * np.power(self.discount_buy,max(price - best_price_buy + adjust, 0)))
                             # amount_new = round(amount * (1 - self.discount * max(price - best_price_buy + adjust, 0)))
                             orders[product].append(Order(product, price, max(-amount_new, -limit)))
                         else:
@@ -171,10 +172,10 @@ class Trader:
                             if self.position[product] == -20:
                                 logger.print(f"Can't Sell {product}")
                             # orders[product].append(Order(product, price, amount))
-                            adjust = max(-self.position[product]/ self.discount_inventory,0) 
-                            amount_new = round(amount * np.power(self.discount,max(best_price_sell - price + adjust, 0)))
+                            adjust = max(-self.position[product]/ self.discount_inventory_sell,0) 
+                            amount_new = round(amount * np.power(self.discount_sell,max(best_price_sell - price + adjust, 0)))
                             # amount_new = round(amount * (1 - self.discount * max(best_price_sell - price + adjust, 0)))
-                            orders[product].append(Order(product, price, max(-amount, -limit)))
+                            orders[product].append(Order(product, price, max(-amount_new, -limit)))
                         else:
                             break
 
