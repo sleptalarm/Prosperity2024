@@ -207,20 +207,20 @@ class Trader:
         mprice_actual = (best_sell_pr + best_buy_pr)/2
         mprice_ours = (acc_bid+acc_ask)/2
 
-        undercut_buy = best_buy_pr + 1
-        undercut_sell = best_sell_pr - 1
+        undercut_buy = best_buy_pr
+        undercut_sell = best_sell_pr
 
         bid_pr = min(undercut_buy, acc_bid-1) # we will shift this by 1 to beat this price
         sell_pr = max(undercut_sell, acc_ask+1)
 
         if (cpos < self.POSITION_LIMIT['AMETHYSTS']) and (self.position[product] < 0):
             num = min(40, self.POSITION_LIMIT['AMETHYSTS'] - cpos)
-            orders.append(Order(product, min(undercut_buy + 1, acc_bid-1), num))
+            orders.append(Order(product, min(undercut_buy, acc_bid), num))
             cpos += num
 
         if (cpos < self.POSITION_LIMIT['AMETHYSTS']) and (self.position[product] > 15):
             num = min(40, self.POSITION_LIMIT['AMETHYSTS'] - cpos)
-            orders.append(Order(product, min(undercut_buy - 1, acc_bid-1), num))
+            orders.append(Order(product, min(undercut_buy, acc_bid), num))
             cpos += num
 
         if cpos < self.POSITION_LIMIT['AMETHYSTS']:
@@ -240,12 +240,12 @@ class Trader:
 
         if (cpos > -self.POSITION_LIMIT['AMETHYSTS']) and (self.position[product] > 0):
             num = max(-40, -self.POSITION_LIMIT['AMETHYSTS']-cpos)
-            orders.append(Order(product, max(undercut_sell-1, acc_ask+1), num))
+            orders.append(Order(product, max(undercut_sell, acc_ask), num))
             cpos += num
 
         if (cpos > -self.POSITION_LIMIT['AMETHYSTS']) and (self.position[product] < -15):
             num = max(-40, -self.POSITION_LIMIT['AMETHYSTS']-cpos)
-            orders.append(Order(product, max(undercut_sell+1, acc_ask+1), num))
+            orders.append(Order(product, max(undercut_sell, acc_ask), num))
             cpos += num
 
         if cpos > -self.POSITION_LIMIT['AMETHYSTS']:
