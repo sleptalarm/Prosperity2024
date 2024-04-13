@@ -117,8 +117,8 @@ logger = Logger()
 
 class Trader:
 
-    position = {'AMETHYSTS': 0, 'STARFRUIT': 0}
-    pos_limit = {'AMETHYSTS': 20, 'STARFRUIT': 20}
+    position = {'AMETHYSTS': 0, 'STARFRUIT': 0, 'ORCHIDS': 0}
+    pos_limit = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100}
     starfruit = []
 
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
@@ -140,7 +140,6 @@ class Trader:
 
                 acceptable_price_buy = 10000
                 acceptable_price_sell = 10000
-
 
                 if len(order_depth.sell_orders) != 0:
                     count1 = 0
@@ -199,7 +198,6 @@ class Trader:
                     sell_volume += abs(sell_list[i][1])
                 midprice = (buy_sum + sell_sum) / (buy_volume + sell_volume)
 
-
                 # add more data if data is less than 6
                 if len(self.starfruit) < 6:
                     self.starfruit.append(midprice)
@@ -208,7 +206,7 @@ class Trader:
                     self.starfruit.append(midprice)
                     self.starfruit.pop(0)
                     price = round(
-                        np.dot(np.transpose(Coefficients), np.array(self.starfruit))) 
+                        np.dot(np.transpose(Coefficients), np.array(self.starfruit)))
 
                     cpos = self.position[product]
 
@@ -242,6 +240,19 @@ class Trader:
 
                     orders[product].append(
                         Order(product, sell_pr, -self.pos_limit[product]-cpos))
+                    
+            elif product == 'ORCHIDS':
+                sell_order = list(order_depth.sell_orders.items())
+                buy_order = list(order_depth.buy_orders.items())
+                for i in range(len(sell_order)):
+                    logger.print(f"Sell Order: {sell_order[i][0]}, {sell_order[i][1]}")
+                for i in range(len(buy_order)):
+                    logger.print(f"Buy Order: {buy_order[i][0]}, {buy_order[i][1]}")
+
+
+
+                # market making
+
 
         logger.flush(state, orders, conversions, trader_data)
         return orders, conversions, trader_data
