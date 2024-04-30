@@ -120,13 +120,15 @@ class Trader:
     position = {'AMETHYSTS': 0, 'STARFRUIT': 0, 'ORCHIDS': 0}
     pos_limit = {'AMETHYSTS': 20, 'STARFRUIT': 20, 'ORCHIDS': 100}
     starfruit = []
+    orchids = []
+    conversions_next = 0
+    fee = 0
 
     def run(self, state: TradingState) -> tuple[dict[Symbol, list[Order]], int, str]:
 
         for key in self.position.keys():
             self.position[key] = 0
         for key, val in state.position.items():
-            logger.print(f"Position for {key}: {val}")
             self.position[key] = val
 
         orders = {}
@@ -134,8 +136,8 @@ class Trader:
         trader_data = ""
 
         for product, order_depth in state.order_depths.items():
-            print(product)
             if product == 'AMETHYSTS':
+                continue
                 orders[product] = []
 
                 acceptable_price_buy = 10000
@@ -178,6 +180,7 @@ class Trader:
                         product, tmp_list2[0][0] + 1, self.pos_limit[product] - self.position[product] - count1))
 
             elif product == 'STARFRUIT':
+                continue
                 orders[product] = []
 
                 # predict price coefficient
@@ -239,16 +242,20 @@ class Trader:
 
                     orders[product].append(
                         Order(product, sell_pr, -self.pos_limit[product]-cpos))
-                    
+
             elif product == 'ORCHIDS':
+                if self.position[product] > 0:
+                    self.fee += self.position[product] * 0.1
+                # conversions = self.conversions_next - self.position[product]
+                conversions = self.conversions_next
+                self.conversions_next = 0
+
                 sell_order = list(order_depth.sell_orders.items())
                 buy_order = list(order_depth.buy_orders.items())
-                for i in range(len(sell_order)):
-                    logger.print(f"Sell Order: {sell_order[i][0]}, {sell_order[i][1]}")
-                for i in range(len(buy_order)):
-                    logger.print(f"Buy Order: {buy_order[i][0]}, {buy_order[i][1]}")
+                orders[product] = []
 
                 ob_info = state.observations.conversionObservations[product]
+                storage_cost = 0.1
                 observe_bid = ob_info.bidPrice
                 observe_ask = ob_info.askPrice
                 observe_transport = ob_info.transportFees
@@ -256,69 +263,124 @@ class Trader:
                 observe_import = ob_info.importTariff
                 observe_sunlight = ob_info.sunlight
                 observe_humidity = ob_info.humidity
-                logger.print(f"Observation bidPirce: {ob_info.bidPrice}, askPrice: {ob_info.askPrice}, transportFees: {ob_info.transportFees}, exportTariff: {ob_info.exportTariff}, importTariff: {ob_info.importTariff}, sunlight: {ob_info.sunlight}, humidity: {ob_info.humidity}")
+                logger.print(
+                    f"Observation bidPirce: {ob_info.bidPrice}, askPrice: {ob_info.askPrice}, transportFees: {ob_info.transportFees}, exportTariff: {ob_info.exportTariff}, importTariff: {ob_info.importTariff}, sunlight: {ob_info.sunlight}, humidity: {ob_info.humidity}")
 
                 # predict_price = 0
-                coefficient = [1.03229731e-05, 3.71634329e-04]
-                intercept = -0.06638624549358343
-                variable = np.array([observe_sunlight, observe_humidity])
-                predict_price = np.dot(coefficient, np.transpose(variable)) + intercept + (observe_bid + ob_info.askPrice) / 2
+                Coefficients = [-0.2056737588652483, -0.05673758865248235, 0.09219858156028365,
+                                0.2411347517730496, 0.3900709219858156, 0.5390070921985816]
 
-                for ask, vol in buy_list:
-                    if (ask <= predict_price - 0.05 * self.position[product]- 0.2) and cpos < self.pos_limit[product]:
-                        if observe_ask + observe_transport + observe_import < ask and cpos < 0:
-                            tmp = min(-vol, -cpos)
-                            conversions += tmp
-                            cpos += tmp
-                        else:
-                            order_for = min(-vol,
-                                        self.pos_limit[product] - cpos)
-                            cpos += order_for
-                            assert (order_for >= 0)
-                            orders[product].append(
-                                Order(product, ask, order_for))
+                buy_list = list(order_depth.sell_orders.items())
+                sell_list = list(order_depth.buy_orders.items())
+                buy_sum = 0
+                buy_volume = 0
+                for i in range(len(buy_list)):
+                    buy_sum += buy_list[i][0] * abs(buy_list[i][1])
+                    buy_volume += abs(buy_list[i][1])
+                sell_sum = 0
+                sell_volume = 0
+                for i in range(len(sell_list)):
+                    sell_sum += sell_list[i][0] * abs(sell_list[i][1])
+                    sell_volume += abs(sell_list[i][1])
+                midprice = (buy_sum + sell_sum) / (buy_volume + sell_volume)
+
+                # if len(self.orchids) < 6:
+                #     self.orchids.append(midprice)
+                # else:
+                #     # expected price
+                #     self.orchids.append(midprice)
+                #     self.orchids.pop(0)
+                #     # price = round(np.dot(np.transpose(Coefficients), np.array(self.orchids)))
+                #     price = np.dot(np.transpose(Coefficients), np.array(self.orchids))
+
+                #     # cpos = self.position[product]
+                #     # for ask, vol in buy_list:
+                #     #     if (ask <= price - 0.05 * self.position[product]) and cpos < self.pos_limit[product]:
+                #     #         order_for = min(-vol,
+                #     #                         self.pos_limit[product] - cpos)
+                #     #         cpos += order_for
+                #     #         assert (order_for >= 0)
+                #     #         orders[product].append(
+                #     #             Order(product, ask, order_for))
+                            
+                #     cpos = self.position[product]
+                #     for ask, vol in buy_list:
+                #         if (midprice <= price - 0.05 * self.position[product]) and cpos < self.pos_limit[product]:
+                #             order_for = min(-vol,
+                #                             self.pos_limit[product] - cpos)
+                #             cpos += order_for
+                #             assert (order_for >= 0)
+                #             orders[product].append(
+                #                 Order(product, ask, order_for))
+
+                #     # bid_pr_tmp, _ = max(sell_list, key=lambda x: x[1])
+                #     # bid_pr = min(bid_pr_tmp + 1, price)
+
+                #     # orders[product].append(
+                #     #     Order(product, bid_pr, self.pos_limit[product] - cpos))
+
+                #     # cpos = self.position[product]
+                #     # for bid, vol in sell_list:
+                #     #     if (bid >= price - 0.05 * self.position[product]) and cpos > -self.pos_limit[product]:
+                #     #         order_for = max(-vol, -
+                #     #                         self.pos_limit[product]-cpos)
+                #     #         cpos += order_for
+                #     #         assert (order_for <= 0)
+                #     #         orders[product].append(
+                #     #             Order(product, bid, order_for))
+                            
+                #     cpos = self.position[product]
+                #     for bid, vol in sell_list:
+                #         if (midprice >= price - 0.05 * self.position[product]) and cpos > -self.pos_limit[product]:
+                #             order_for = max(-vol, -
+                #                             self.pos_limit[product]-cpos)
+                #             cpos += order_for
+                #             assert (order_for <= 0)
+                #             orders[product].append(
+                #                 Order(product, bid, order_for))
+
+                #     # sell_pr_tmp, _ = min(buy_list, key=lambda x: x[1])
+                #     # sell_pr = max(sell_pr_tmp - 1, price + 1)
+
+                #     # orders[product].append(
+                #     #     Order(product, sell_pr, -self.pos_limit[product]-cpos))
+                #     logger.print(
+                #         f"conversions: {conversions}, position: {self.position[product]}, cpos: {cpos}, fee: {self.fee}")
                     
-                if observe_bid + observe_transport + observe_export > predict_price and cpos > 0:
-                    conversions += -cpos
-                    cpos = 0
 
-                bid_pr_tmp, _ = max(sell_list, key=lambda x: x[1])
-                bid_pr = min(bid_pr_tmp + 1, price)
-
-                
-                    
-                orders[product].append(
-                    Order(product, bid_pr, self.pos_limit[product] - cpos))
-                
+                # Arbitrage
+                final_bid = observe_bid - observe_transport - observe_export - storage_cost
+                final_ask = observe_ask + observe_transport + observe_import
                 cpos = self.position[product]
-                for bid, vol in sell_list:
-                    if (bid >= predict_price - 0.05 * self.position[product] + 0.2) and cpos > -self.pos_limit[product]:
-                        if observe_ask + observe_transport + observe_import > bid and cpos > 0:
-                            tmp = max(-vol, -cpos)
-                            conversions += tmp
-                            cpos += tmp
-                        else:
-                            order_for = max(-vol, -
-                                            self.pos_limit[product]-cpos)
-                            cpos += order_for
-                            assert (order_for <= 0)
-                            orders[product].append(
-                                Order(product, bid, order_for))
+                for ask, vol in sell_order:
+                    # direct trade with south with orders on market if arbitrage opportunity exists
+                    if final_bid > ask:
+                        orders[product].append(Order(product, ask, -vol))
+                        cpos -= vol
+                        # if cpos > 0:
+                        # conversions += vol
+                        self.conversions_next += vol
+                        logger.print(f"Sell to south: {ask}, {vol}")
+                logger.print(f"CPOS: {cpos}, Conversions: {self.conversions_next}")
 
-                sell_pr_tmp, _ = min(buy_list, key=lambda x: x[1])
-                sell_pr = max(sell_pr_tmp - 1, price + 1)
+                cpos = self.position[product]
+                for bid, vol in buy_order:
+                    # direct trade with south with orders on market if arbitrage opportunity exists
+                    if final_ask < bid:
+                        orders[product].append(Order(product, bid, -vol))
+                        cpos -= vol
+                        # if cpos < 0:
+                        # conversions += vol
+                        self.conversions_next += vol
+                        logger.print(f"Sell to local: {bid}, {vol}")
 
-                if observe_ask + observe_transport + observe_import < predict_price and cpos < 0:
-                    conversions += -cpos
-                    cpos = 0
+                # orders[product].append(Order(product, round(final_ask + 2), -self.pos_limit[product] -cpos))
+                # orders[product].append(Order(product, round(final_bid - 2), self.pos_limit[product] - cpos))
+                
+                logger.print(f"CPOS2: {cpos}, Conversions2: {self.conversions_next}")
 
-                orders[product].append(
-                    Order(product, sell_pr, -self.pos_limit[product]-cpos))
-
-
-
-                # market making
-
+                logger.print(
+                    f"final ask: {final_ask}, final bid: {final_bid}, conversions: {conversions}, position: {self.position[product]}, cpos: {cpos}")
 
         logger.flush(state, orders, conversions, trader_data)
         return orders, conversions, trader_data

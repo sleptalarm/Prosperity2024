@@ -2,7 +2,6 @@ import json
 from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
 from typing import Any
 import numpy as np
-from collections import Counter
 
 
 class Logger:
